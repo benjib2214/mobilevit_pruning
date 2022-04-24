@@ -37,7 +37,18 @@ def prune_model_l1_unstructured(model):
             prune.remove(module, 'weight')
         else:
             print("No Pruning")
+    return model
 
+def prune_model_global_structured(model,prune_ammount=.6):
+    parameters_to_prune = []
+    for name, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d):
+            parameters_to_prune.append((module, 'weight'))
+        elif isinstance(module, torch.nn.Linear):
+            parameters_to_prune.append((module, 'weight'))
+    prune.global_unstructured( parameters_to_prune, pruning_method=prune.L1Unstructured,amount=prune_ammount)
+    for module, _ in parameters_to_prune:
+        prune.remove(module, 'weight')
     return model
 
 def sparsity_calculation(model):
@@ -67,24 +78,13 @@ if __name__ == '__main__':
 
     model.load_state_dict(torch.load("./saved_models/unpruned_weights.pth"))
 
-    new_model = copy.deepcopy(model)
-
-    sparsity_calculation(new_model)
-
-    new_model = prune_model_l1_unstructured(new_model)
-
-    torch.save(model.state_dict(), "./saved_models/pruned_weights.pth")
-
-    print("Testing Pruned")
-
-    cifar_test = datasets.CIFAR10('./data/cifar10', train=False, download=True, transform=test_transform)
-
+    cifar_test = datasets.CIFAR10('./data/cifar10', train=False, download=True, transform=test_transform)    
     test_loader = torch.utils.data.DataLoader(cifar_test,
-                                              batch_size = 128,
+                                              batch_size = 100,
                                               num_workers = 2,
                                               drop_last = True,
                                               shuffle = True
-                                              )
+    )
 
     test_correct = 0
     test_total = 0
@@ -94,10 +94,38 @@ if __name__ == '__main__':
             images, labels = data
             images, labels = images.to(device), labels.to(device)
 
-            outputs = new_model(images)
-
+            outputs = model(images)
             _, predicted = torch.max(outputs.data, 1)
             test_total += labels.size(0)
             test_correct += (predicted == labels).sum().item()
 
-    print(f'Accuracy of the network on the {test_total} test images: {100 * test_correct // test_total} %')
+    print(f'Accuracy of the network on the {test_total} test images: {100 * test_correct / test_total} %')
+    new_model = copy.deepcopy(model)
+
+    sparsity_calculation(new_model)
+
+    # new_model = prune_model_l1_unstructured(new_model)
+    new_model = prune_model_global_structured(new_model,.65)
+    
+    torch.save(model.state_dict(), "./saved_models/pruned_weights.pth")
+
+    print("Testing Pruned")
+
+
+
+    
+    test_correct = 0
+    test_total = 0
+
+    with torch.no_grad():
+        for i, data in enumerate(test_loader):
+            images, labels = data
+            images, labels = images.to(device), labels.to(device)
+
+            outputs = new_model(images)
+            ouputs_original = model(images)
+            _, predicted = torch.max(outputs.data, 1)
+            test_total += labels.size(0)
+            test_correct += (predicted == labels).sum().item()
+
+    print(f'Accuracy of the network on the {test_total} test images: {100 * test_correct / test_total} %')
