@@ -81,7 +81,6 @@ def test_model(model,test_loader):
             test_total += labels.size(0)
             test_correct += (predicted == labels).sum().item()
     return 100 * test_correct / test_total, test_total
-    # print(f'Accuracy of the network on the {test_total} test images: {100 * test_correct / test_total} %')
 
 if __name__ == '__main__':
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -100,11 +99,7 @@ if __name__ == '__main__':
                                               shuffle = True
     )
     new_model = mobilevit_xxs()
-    
-
     sparsity_calculation(new_model)
-
-    # new_model = prune_model_l1_unstructured(new_model)
     for i in range(20):
         new_model.load_state_dict(torch.load("./saved_models/unpruned_weights.pth"))
         new_model = new_model.to(device)
